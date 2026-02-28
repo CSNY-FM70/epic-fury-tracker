@@ -565,10 +565,40 @@
         <div class="dot green"></div>
         <div>
           <div class="intel-header-title">LIVE INTEL FEED</div>
-          <div class="intel-header-sub">AI-POWERED OSINT · AUTO-UPDATING</div>
+          <div class="intel-header-sub">MULTI-SOURCE OSINT · GNEWS · NEWSDATA · RSS</div>
         </div>
       </div>
-      <button class="intel-close" onclick="toggleIntel()">✕</button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="intel-close" onclick="toggleSettings()" title="API Key Settings" style="font-size:15px;">⚙</button>
+        <button class="intel-close" onclick="toggleIntel()">✕</button>
+      </div>
+    </div>
+
+    <!-- API KEY SETTINGS PANEL -->
+    <div id="settingsPanel" style="display:none;padding:14px 16px;background:rgba(57,255,20,0.03);border-bottom:1px solid rgba(57,255,20,0.15);">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--green);margin-bottom:10px;">⚙ API KEYS (OPTIONAL — SAVED LOCALLY)</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#4a6a5a;margin-bottom:10px;line-height:1.6;">
+        RSS feeds work with zero config.<br>Add keys below for richer, faster results.
+      </div>
+      <div style="margin-bottom:8px;">
+        <label style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:1px;display:block;margin-bottom:3px;">
+          GNEWS.IO <a href="https://gnews.io" target="_blank" style="color:var(--green);text-decoration:none;opacity:0.6;">(free: 100/day)</a>
+        </label>
+        <input id="keyGnews" type="password" placeholder="Enter GNews API key..." style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border);color:var(--text);padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;">
+      </div>
+      <div style="margin-bottom:8px;">
+        <label style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:1px;display:block;margin-bottom:3px;">
+          NEWSDATA.IO <a href="https://newsdata.io" target="_blank" style="color:var(--green);text-decoration:none;opacity:0.6;">(free: 200/day)</a>
+        </label>
+        <input id="keyNewsdata" type="password" placeholder="Enter NewsData API key..." style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border);color:var(--text);padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:1px;display:block;margin-bottom:3px;">
+          CURRENTS API <a href="https://currentsapi.services/en/register" target="_blank" style="color:var(--green);text-decoration:none;opacity:0.6;">(free: 600/day)</a>
+        </label>
+        <input id="keyCurrents" type="password" placeholder="Enter Currents API key..." style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border);color:var(--text);padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;">
+      </div>
+      <button onclick="saveKeys()" style="background:rgba(57,255,20,0.1);border:1px solid rgba(57,255,20,0.3);color:var(--green);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;padding:7px 16px;cursor:pointer;text-transform:uppercase;width:100%;">SAVE KEYS</button>
     </div>
     <div class="intel-controls">
       <button class="intel-refresh-btn" id="refreshBtn" onclick="fetchIntel()">
@@ -583,7 +613,7 @@
     <div class="intel-feed" id="intelFeed">
       <div class="intel-empty">
         <div class="intel-empty-icon">📡</div>
-        <div class="intel-empty-text">Click "FETCH LATEST" to pull<br>live intelligence from news sources</div>
+        <div class="intel-empty-text">Click "FETCH LATEST" to pull<br>live intel from news APIs + RSS feeds<br><br><span style="color:#2a4a3a;font-size:9px;">Works out of the box via RSS · Add API keys via ⚙ for more</span></div>
       </div>
     </div>
   </div>
@@ -593,11 +623,11 @@
 <footer>
   <div class="footer-sources">
     <span>SRC: REUTERS</span><span>·</span>
-    <span>NBC NEWS</span><span>·</span>
     <span>AL JAZEERA</span><span>·</span>
-    <span>AXIOS</span><span>·</span>
-    <span>CBS NEWS</span><span>·</span>
-    <span>PENTAGON·X</span>
+    <span>BBC</span><span>·</span>
+    <span>GNEWS</span><span>·</span>
+    <span>NEWSDATA</span><span>·</span>
+    <span>RSS FEEDS</span>
   </div>
   <div class="footer-scroll">
     <span class="ticker-wrap" id="tickerWrap">
@@ -837,141 +867,183 @@ L.circle([30.5, 49.5], { radius:900000, color:RED, weight:1, fillColor:RED, fill
 }).addTo(map).bindTooltip('IRGC Short-Range / Ballistic Threat Zone ~900km', { sticky:true, direction:'top' });
 
 // ══════════════════════════════════════════════════════════════
-// LIVE INTEL FEED — Anthropic API + Web Search
+// LIVE INTEL FEED — Multi-Source Free News APIs + RSS Fallback
 // ══════════════════════════════════════════════════════════════
+//
+// SOURCE PRIORITY (cascading fallback):
+//   1. GNews.io      — free 100 req/day, CORS-friendly (needs key)
+//   2. NewsData.io   — free 200 req/day, CORS-friendly (needs key)
+//   3. Currents API  — free 600 req/day, CORS-friendly (needs key)
+//   4. RSS Feeds     — unlimited, zero-config fallback (no key needed)
+//       Al Jazeera, Reuters, BBC, NPR via CORS proxy
+//
+// Keys are stored in localStorage so they persist across sessions.
+// RSS fallback always works even with no keys configured.
+// ══════════════════════════════════════════════════════════════
+
+const SEARCH_TERMS = [
+  'Iran military', 'Iran Israel strikes', 'Iran nuclear',
+  'Middle East conflict', 'Iran US war', 'Operation Epic Fury',
+  'IRGC missile', 'Strait of Hormuz', 'Iran airstrikes'
+];
+
+const RSS_FEEDS = [
+  { name: 'AL JAZEERA',  url: 'https://www.aljazeera.com/xml/rss/all.xml' },
+  { name: 'BBC NEWS',    url: 'https://feeds.bbci.co.uk/news/world/middle_east/rss.xml' },
+  { name: 'NPR',         url: 'https://feeds.npr.org/1004/rss.xml' },  // NPR World
+  { name: 'REUTERS',     url: 'https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best' },
+  { name: 'CBS NEWS',    url: 'https://www.cbsnews.com/latest/rss/world' },
+];
+
+// Multiple CORS proxies for redundancy
+const CORS_PROXIES = [
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
 let autoRefreshInterval = null;
 let intelItems = [];
+let currentProxyIndex = 0;
+let settingsOpen = false;
 
+// ── Key Management (localStorage) ──
+function getKey(provider) {
+  try { return localStorage.getItem(`epic_fury_${provider}_key`) || ''; }
+  catch(e) { return ''; }
+}
+function setKey(provider, key) {
+  try { localStorage.setItem(`epic_fury_${provider}_key`, key.trim()); }
+  catch(e) { /* storage blocked */ }
+}
+
+// ── UI Toggles ──
 function toggleIntel() {
-  const panel = document.getElementById('intelPanel');
-  panel.classList.toggle('open');
+  document.getElementById('intelPanel').classList.toggle('open');
+}
+
+function toggleSettings() {
+  settingsOpen = !settingsOpen;
+  const el = document.getElementById('settingsPanel');
+  el.style.display = settingsOpen ? 'block' : 'none';
+  // Populate fields
+  if (settingsOpen) {
+    document.getElementById('keyGnews').value = getKey('gnews');
+    document.getElementById('keyNewsdata').value = getKey('newsdata');
+    document.getElementById('keyCurrents').value = getKey('currents');
+  }
+}
+
+function saveKeys() {
+  setKey('gnews',   document.getElementById('keyGnews').value);
+  setKey('newsdata', document.getElementById('keyNewsdata').value);
+  setKey('currents', document.getElementById('keyCurrents').value);
+  toggleSettings();
+  // Flash status
+  const s = document.getElementById('intelStatus');
+  s.textContent = 'KEYS SAVED'; s.style.color = 'var(--green)';
+  setTimeout(() => { s.textContent = 'READY'; s.style.color = '#3a5a4a'; }, 2000);
 }
 
 function toggleAutoRefresh() {
-  const checked = document.getElementById('autoRefresh').checked;
-  if (checked) {
-    startAutoRefresh();
-  } else {
-    stopAutoRefresh();
-  }
+  document.getElementById('autoRefresh').checked ? startAutoRefresh() : stopAutoRefresh();
 }
-
 function startAutoRefresh() {
   stopAutoRefresh();
-  autoRefreshInterval = setInterval(() => {
-    fetchIntel();
-  }, 5 * 60 * 1000); // 5 minutes
+  autoRefreshInterval = setInterval(fetchIntel, 5 * 60 * 1000);
 }
-
 function stopAutoRefresh() {
-  if (autoRefreshInterval) {
-    clearInterval(autoRefreshInterval);
-    autoRefreshInterval = null;
-  }
+  if (autoRefreshInterval) { clearInterval(autoRefreshInterval); autoRefreshInterval = null; }
 }
-
-// Start auto-refresh on load
 startAutoRefresh();
 
+// ══════════════════════════════════════════════════════════════
+// MASTER FETCH — cascading through all available sources
+// ══════════════════════════════════════════════════════════════
 async function fetchIntel() {
-  const btn = document.getElementById('refreshBtn');
-  const status = document.getElementById('intelStatus');
+  const btn  = document.getElementById('refreshBtn');
+  const stat = document.getElementById('intelStatus');
 
   btn.disabled = true;
   btn.classList.add('loading');
   btn.textContent = '⟳ SEARCHING...';
-  status.textContent = 'QUERYING SOURCES...';
-  status.style.color = 'var(--amber)';
+  stat.textContent = 'QUERYING SOURCES...';
+  stat.style.color = 'var(--amber)';
 
-  try {
-    // Use Anthropic API with web search to find latest news
-    const searchQueries = [
-      'Iran US military strikes latest today 2026',
-      'Operation Epic Fury Iran Israel news today',
-      'Middle East conflict Iran nuclear February 2026'
-    ];
+  let items = [];
+  let usedSource = '';
 
-    // Make parallel search calls via Anthropic API
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{
-          role: 'user',
-          content: `You are a military OSINT news aggregator. Search for the very latest news about the Iran-US-Israel military conflict, Operation Epic Fury, Iranian nuclear strikes, Middle East military developments, and any related breaking news from today February 28, 2026.
-
-Return ONLY a valid JSON array (no markdown, no backticks, no preamble) of news items. Each item should have these fields:
-- "headline": string (short, punchy headline)
-- "body": string (2-3 sentence summary)
-- "source": string (news outlet name, uppercase)
-- "url": string (source URL if available, empty string if not)
-- "breaking": boolean (true if this is a major breaking development)
-- "time": string (time of report if known, e.g. "14:30 UTC" or "2 hours ago")
-
-Return 6-10 items sorted by recency (newest first). Focus on factual reporting from Reuters, AP, BBC, Al Jazeera, NBC, CBS, CNN, Axios, NYT, and other major outlets.`
-        }]
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`API returned ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Extract text from response
-    let fullText = '';
-    if (data.content) {
-      for (const block of data.content) {
-        if (block.type === 'text') {
-          fullText += block.text;
-        }
-      }
-    }
-
-    // Parse JSON from response
-    let newsItems = [];
+  // ── 1. Try GNews ──
+  const gnewsKey = getKey('gnews');
+  if (gnewsKey && items.length === 0) {
+    stat.textContent = 'SOURCE: GNEWS API...';
     try {
-      // Try to find JSON array in response
-      const jsonMatch = fullText.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        newsItems = JSON.parse(jsonMatch[0]);
-      }
-    } catch (parseErr) {
-      console.warn('JSON parse failed, using raw text', parseErr);
-    }
+      items = await fetchGNews(gnewsKey);
+      usedSource = 'GNEWS';
+    } catch(e) { console.warn('GNews failed:', e.message); }
+  }
 
-    if (newsItems.length > 0) {
-      renderIntelItems(newsItems);
-      updateTicker(newsItems);
-      status.textContent = `UPDATED ${new Date().toUTCString().slice(17,25)} UTC`;
-      status.style.color = 'var(--green)';
-    } else {
-      // If structured parsing failed, show the raw intel
-      renderRawIntel(fullText);
-      status.textContent = `PARTIAL ${new Date().toUTCString().slice(17,25)} UTC`;
-      status.style.color = 'var(--amber)';
-    }
+  // ── 2. Try NewsData.io ──
+  const newsdataKey = getKey('newsdata');
+  if (newsdataKey && items.length === 0) {
+    stat.textContent = 'SOURCE: NEWSDATA.IO...';
+    try {
+      items = await fetchNewsData(newsdataKey);
+      usedSource = 'NEWSDATA';
+    } catch(e) { console.warn('NewsData failed:', e.message); }
+  }
 
-  } catch (err) {
-    console.error('Intel fetch error:', err);
+  // ── 3. Try Currents API ──
+  const currentsKey = getKey('currents');
+  if (currentsKey && items.length === 0) {
+    stat.textContent = 'SOURCE: CURRENTS API...';
+    try {
+      items = await fetchCurrents(currentsKey);
+      usedSource = 'CURRENTS';
+    } catch(e) { console.warn('Currents failed:', e.message); }
+  }
+
+  // ── 4. Fallback: RSS Feeds (always available) ──
+  if (items.length === 0) {
+    stat.textContent = 'SOURCE: RSS FEEDS...';
+    try {
+      items = await fetchAllRSS();
+      usedSource = 'RSS';
+    } catch(e) { console.warn('RSS failed:', e.message); }
+  }
+
+  // ── Render results ──
+  if (items.length > 0) {
+    // Sort by date descending, breaking first
+    items.sort((a,b) => {
+      if (a.breaking && !b.breaking) return -1;
+      if (!a.breaking && b.breaking) return 1;
+      return (b._ts || 0) - (a._ts || 0);
+    });
+    items = items.slice(0, 15); // Cap at 15
+
+    renderIntelItems(items);
+    updateTicker(items);
+    const now = new Date();
+    const ts = String(now.getUTCHours()).padStart(2,'0') + ':' +
+               String(now.getUTCMinutes()).padStart(2,'0');
+    stat.textContent = `${usedSource} · ${items.length} ITEMS · ${ts} UTC`;
+    stat.style.color = 'var(--green)';
+  } else {
     document.getElementById('intelFeed').innerHTML = `
       <div class="intel-error">
-        ⚠ SIGNAL INTERRUPTED<br><br>
+        ⚠ NO SIGNAL<br><br>
         <span style="color:#5a7a6a;font-size:10px;">
-          ${err.message}<br><br>
-          This feed uses the Anthropic API with web search.<br>
-          It works automatically when viewed as a<br>
-          shared Claude artifact.<br><br>
-          For standalone deployment, see the<br>
-          deployment guide below.
+          All news sources returned empty results.<br><br>
+          Click ⚙ to add a free API key for better results:<br>
+          • <a href="https://gnews.io" target="_blank" style="color:var(--green)">gnews.io</a> — 100 free req/day<br>
+          • <a href="https://newsdata.io" target="_blank" style="color:var(--green)">newsdata.io</a> — 200 free req/day<br>
+          • <a href="https://currentsapi.services" target="_blank" style="color:var(--green)">currentsapi.services</a> — 600 free req/day<br><br>
+          RSS fallback will retry on next refresh.
         </span>
       </div>`;
-    status.textContent = 'ERROR';
-    status.style.color = 'var(--red)';
+    stat.textContent = 'NO DATA';
+    stat.style.color = 'var(--red)';
   }
 
   btn.disabled = false;
@@ -979,12 +1051,208 @@ Return 6-10 items sorted by recency (newest first). Focus on factual reporting f
   btn.textContent = '↻ FETCH LATEST';
 }
 
+// ══════════════════════════════════════════════════════════════
+// SOURCE 1: GNews.io — https://gnews.io (free: 100 req/day)
+// ══════════════════════════════════════════════════════════════
+async function fetchGNews(apiKey) {
+  const queries = ['Iran military strikes', 'Iran Israel conflict', 'Middle East war'];
+  const allItems = [];
+
+  for (const q of queries) {
+    const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&lang=en&max=10&apikey=${apiKey}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`GNews ${resp.status}`);
+    const data = await resp.json();
+
+    if (data.articles) {
+      for (const a of data.articles) {
+        allItems.push({
+          headline: a.title || '',
+          body: a.description || a.content || '',
+          source: (a.source?.name || 'GNEWS').toUpperCase(),
+          url: a.url || '',
+          time: formatTime(a.publishedAt),
+          breaking: isBreaking(a.title),
+          _ts: new Date(a.publishedAt).getTime() || 0,
+          _id: a.url
+        });
+      }
+    }
+  }
+  return dedup(allItems);
+}
+
+// ══════════════════════════════════════════════════════════════
+// SOURCE 2: NewsData.io — https://newsdata.io (free: 200 req/day)
+// ══════════════════════════════════════════════════════════════
+async function fetchNewsData(apiKey) {
+  const url = `https://newsdata.io/api/1/latest?apikey=${apiKey}&q=Iran+military+OR+Iran+Israel+OR+Middle+East+conflict&language=en&category=politics,world`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`NewsData ${resp.status}`);
+  const data = await resp.json();
+
+  if (!data.results) return [];
+  return dedup(data.results.map(a => ({
+    headline: a.title || '',
+    body: a.description || a.content || '',
+    source: (a.source_name || a.source_id || 'NEWSDATA').toUpperCase(),
+    url: a.link || '',
+    time: formatTime(a.pubDate),
+    breaking: isBreaking(a.title),
+    _ts: new Date(a.pubDate).getTime() || 0,
+    _id: a.link
+  })));
+}
+
+// ══════════════════════════════════════════════════════════════
+// SOURCE 3: Currents API — https://currentsapi.services (free: 600 req/day)
+// ══════════════════════════════════════════════════════════════
+async function fetchCurrents(apiKey) {
+  const url = `https://api.currentsapi.services/v1/search?keywords=Iran+military+Israel+Middle+East&language=en&apiKey=${apiKey}`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`Currents ${resp.status}`);
+  const data = await resp.json();
+
+  if (!data.news) return [];
+  return dedup(data.news.map(a => ({
+    headline: a.title || '',
+    body: a.description || '',
+    source: (a.author || 'CURRENTS').toUpperCase(),
+    url: a.url || '',
+    time: formatTime(a.published),
+    breaking: isBreaking(a.title),
+    _ts: new Date(a.published).getTime() || 0,
+    _id: a.url
+  })));
+}
+
+// ══════════════════════════════════════════════════════════════
+// SOURCE 4: RSS Feeds — zero-config fallback via CORS proxy
+// ══════════════════════════════════════════════════════════════
+async function fetchAllRSS() {
+  const allItems = [];
+  const feedPromises = RSS_FEEDS.map(feed => fetchSingleRSS(feed).catch(() => []));
+  const results = await Promise.allSettled(feedPromises);
+
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value) {
+      allItems.push(...r.value);
+    }
+  }
+
+  // Filter for Middle East / Iran relevance
+  const keywords = /iran|israel|tehran|irgc|hezbollah|houthi|middle.?east|gulf|strait.?of.?hormuz|nuclear|missile|strike|military|pentagon|idf|war|conflict|bomb|attack|drone/i;
+  const filtered = allItems.filter(item =>
+    keywords.test(item.headline) || keywords.test(item.body)
+  );
+
+  return dedup(filtered.length > 0 ? filtered : allItems.slice(0, 10));
+}
+
+async function fetchSingleRSS(feed) {
+  let xml = null;
+
+  // Try each CORS proxy until one works
+  for (let i = 0; i < CORS_PROXIES.length; i++) {
+    const proxyIdx = (currentProxyIndex + i) % CORS_PROXIES.length;
+    const proxyUrl = CORS_PROXIES[proxyIdx](feed.url);
+    try {
+      const resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+      if (resp.ok) {
+        xml = await resp.text();
+        currentProxyIndex = proxyIdx; // Remember working proxy
+        break;
+      }
+    } catch(e) { continue; }
+  }
+
+  if (!xml) return [];
+  return parseRSS(xml, feed.name);
+}
+
+function parseRSS(xml, sourceName) {
+  const items = [];
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, 'text/xml');
+
+    // Handle both RSS <item> and Atom <entry>
+    const entries = doc.querySelectorAll('item, entry');
+    entries.forEach(entry => {
+      const title = entry.querySelector('title')?.textContent?.trim() || '';
+      const desc = entry.querySelector('description, summary, content')?.textContent?.trim() || '';
+      const link = entry.querySelector('link')?.textContent?.trim()
+                || entry.querySelector('link')?.getAttribute('href') || '';
+      const pubDate = entry.querySelector('pubDate, published, updated')?.textContent?.trim() || '';
+
+      // Strip HTML tags from description
+      const cleanDesc = desc.replace(/<[^>]*>/g, '').replace(/&[a-z]+;/gi, ' ').trim();
+
+      if (title) {
+        items.push({
+          headline: title,
+          body: cleanDesc.substring(0, 300),
+          source: sourceName,
+          url: link,
+          time: formatTime(pubDate),
+          breaking: isBreaking(title),
+          _ts: new Date(pubDate).getTime() || 0,
+          _id: link || title
+        });
+      }
+    });
+  } catch(e) { console.warn('RSS parse error for', sourceName, e); }
+  return items;
+}
+
+// ══════════════════════════════════════════════════════════════
+// UTILITIES
+// ══════════════════════════════════════════════════════════════
+function isBreaking(title) {
+  if (!title) return false;
+  const t = title.toLowerCase();
+  return /breaking|just.?in|urgent|alert|confirmed|killed|struck|attacked|launches|declares|emergency/i.test(t);
+}
+
+function formatTime(dateStr) {
+  if (!dateStr) return 'RECENT';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'RECENT';
+    const now = Date.now();
+    const diffMs = now - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+
+    if (diffMin < 1) return 'JUST NOW';
+    if (diffMin < 60) return `${diffMin}m AGO`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `${diffH}h AGO`;
+    const diffD = Math.floor(diffH / 24);
+    if (diffD < 7) return `${diffD}d AGO`;
+
+    return d.toISOString().slice(0,10);
+  } catch(e) { return 'RECENT'; }
+}
+
+function dedup(items) {
+  const seen = new Set();
+  return items.filter(item => {
+    const key = item._id || item.headline;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDERING
+// ══════════════════════════════════════════════════════════════
 function renderIntelItems(items) {
   const feed = document.getElementById('intelFeed');
   intelItems = items;
 
   feed.innerHTML = items.map((item, i) => `
-    <div class="intel-item ${item.breaking ? 'breaking' : ''}" style="animation-delay:${i * 0.06}s">
+    <div class="intel-item ${item.breaking ? 'breaking' : ''}" style="animation-delay:${i * 0.05}s">
       <div class="intel-item-header">
         <div class="intel-item-source">${item.breaking ? '🔴 BREAKING · ' : ''}${escapeHtml(item.source || 'OSINT')}</div>
         <div class="intel-item-time">${escapeHtml(item.time || 'RECENT')}</div>
@@ -996,29 +1264,17 @@ function renderIntelItems(items) {
   `).join('');
 }
 
-function renderRawIntel(text) {
-  const feed = document.getElementById('intelFeed');
-  // Split into paragraphs and render
-  const paragraphs = text.split('\n').filter(p => p.trim());
-  feed.innerHTML = paragraphs.map((p, i) => `
-    <div class="intel-item" style="animation-delay:${i * 0.06}s">
-      <div class="intel-item-header">
-        <div class="intel-item-source">AI ANALYSIS</div>
-        <div class="intel-item-time">${new Date().toUTCString().slice(17,25)} UTC</div>
-      </div>
-      <div class="intel-item-body">${escapeHtml(p)}</div>
-    </div>
-  `).join('');
-}
-
 function updateTicker(items) {
   const ticker = document.getElementById('tickerWrap');
-  const breakingItems = items.filter(i => i.breaking || i.headline);
-  if (breakingItems.length > 0) {
-    const tickerText = breakingItems.map(i =>
+  // Prefer breaking items, fall back to most recent headlines
+  const headlineItems = items.filter(i => i.headline).slice(0, 8);
+  if (headlineItems.length > 0) {
+    const tickerText = headlineItems.map(i =>
       `● ${(i.headline || '').toUpperCase()} — ${(i.source || 'OSINT').toUpperCase()}`
     ).join(' &nbsp;·&nbsp; ');
     ticker.innerHTML = tickerText + ' &nbsp;·&nbsp; ';
+    // Adjust speed based on content length
+    ticker.style.animationDuration = Math.max(30, headlineItems.length * 8) + 's';
   }
 }
 
