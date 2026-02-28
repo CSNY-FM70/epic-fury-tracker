@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OPERATION EPIC FURY — LIVE TRACKER</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Oswald:wght@400;600;700&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root {
+    --red:    #ff2222;
+    --amber:  #ffb300;
+    --green:  #39ff14;
+    --cyan:   #00e5ff;
+    --blue:   #2979ff;
+    --purple: #d500f9;
+    --bg:     #050a0f;
+    --panel:  rgba(5,15,25,0.92);
+    --border: rgba(0,229,255,0.18);
+    --text:   #c8dce8;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    font-family: 'Barlow Condensed', sans-serif;
+    color: var(--text);
+    height: 100vh; width: 100vw;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 310px 1fr;
+    grid-template-rows: 58px 1fr 44px;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px;
+    background: linear-gradient(90deg,#0a1520 0%,#07111c 60%,#0a1520 100%);
+    border-bottom: 1px solid var(--border);
+    position: relative; overflow: hidden;
+  }
+  header::after {
+    content:''; position:absolute; left:0; bottom:0; width:100%; height:1px;
+    background: linear-gradient(90deg, transparent, var(--red), var(--amber), var(--red), transparent);
+    animation: scanline 3s linear infinite;
+  }
+  @keyframes scanline { 0%{transform:scaleX(0) translateX(-100%)} 100%{transform:scaleX(1) translateX(100%)} }
+
+  .header-left { display:flex; align-items:center; gap:14px; }
+  .op-badge {
+    background: var(--red); color:#fff; font-family:'Share Tech Mono',monospace;
+    font-size:10px; font-weight:700; padding:3px 8px; letter-spacing:2px;
+    text-transform:uppercase; border:1px solid rgba(255,34,34,0.5);
+    animation: badgePulse 1.8s ease-in-out infinite;
+  }
+  @keyframes badgePulse {
+    0%,100%{box-shadow:0 0 6px var(--red)} 50%{box-shadow:0 0 18px var(--red), 0 0 30px rgba(255,34,34,0.3)}
+  }
+  .header-title {
+    font-family:'Oswald',sans-serif; font-size:22px; font-weight:700;
+    letter-spacing:3px; text-transform:uppercase; color:#fff;
+    text-shadow: 0 0 20px rgba(255,34,34,0.6);
+  }
+  .header-title span { color: var(--red); }
+  .header-sub {
+    font-family:'Share Tech Mono',monospace; font-size:11px; color:#7a9bb5;
+    letter-spacing:1.5px; margin-top:1px;
+  }
+  .header-right { display:flex; align-items:center; gap:20px; text-align:right; }
+  .stat-box { text-align:center; }
+  .stat-val { font-family:'Share Tech Mono',monospace; font-size:20px; font-weight:700; line-height:1; }
+  .stat-lbl { font-size:10px; letter-spacing:1.5px; color:#5a7a8a; text-transform:uppercase; margin-top:2px; }
+  .stat-val.red { color:var(--red); text-shadow:0 0 10px var(--red); }
+  .stat-val.amber { color:var(--amber); text-shadow:0 0 10px var(--amber); }
+  .stat-val.cyan { color:var(--cyan); }
+  .vdiv { width:1px; height:36px; background:var(--border); }
+  .live-dot {
+    width:9px; height:9px; border-radius:50%; background:var(--red);
+    display:inline-block; margin-right:6px;
+    box-shadow:0 0 8px var(--red);
+    animation: liveBlink 1s ease-in-out infinite;
+  }
+  @keyframes liveBlink { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .live-label { font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--red); letter-spacing:2px; }
+
+  /* ─── SIDEBAR ─── */
+  aside {
+    grid-row: 2; grid-column: 1;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 0;
+    display: flex; flex-direction: column;
+  }
+  aside::-webkit-scrollbar { width:4px; }
+  aside::-webkit-scrollbar-track { background: transparent; }
+  aside::-webkit-scrollbar-thumb { background: var(--border); border-radius:2px; }
+
+  .section-head {
+    padding: 8px 14px; font-family:'Share Tech Mono',monospace;
+    font-size:10px; letter-spacing:2px; text-transform:uppercase;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items:center; gap:8px;
+  }
+  .section-head.attacked { background:rgba(255,34,34,0.08); color:var(--red); border-color:rgba(255,34,34,0.25); }
+  .section-head.alert    { background:rgba(255,179,0,0.07); color:var(--amber); border-color:rgba(255,179,0,0.2); }
+  .section-head.offense  { background:rgba(41,121,255,0.07); color:var(--blue); border-color:rgba(41,121,255,0.2); }
+  .section-head.isr      { background:rgba(57,255,20,0.06); color:var(--green); border-color:rgba(57,255,20,0.2); }
+  .section-head.iran     { background:rgba(213,0,249,0.07); color:var(--purple); border-color:rgba(213,0,249,0.2); }
+  .section-head.naval    { background:rgba(0,229,255,0.07); color:var(--cyan); border-color:rgba(0,229,255,0.2); }
+  .section-head.intel    { background:rgba(57,255,20,0.06); color:var(--green); border-color:rgba(57,255,20,0.2); }
+  .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .dot.red { background:var(--red); box-shadow:0 0 6px var(--red); }
+  .dot.amber { background:var(--amber); box-shadow:0 0 6px var(--amber); }
+  .dot.blue { background:var(--blue); box-shadow:0 0 6px var(--blue); }
+  .dot.green { background:var(--green); box-shadow:0 0 6px var(--green); }
+  .dot.purple { background:var(--purple); box-shadow:0 0 6px var(--purple); }
+  .dot.cyan { background:var(--cyan); box-shadow:0 0 6px var(--cyan); }
+
+  .base-list { padding: 4px 0; }
+  .base-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 7px 14px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    cursor: pointer; transition: background 0.15s;
+  }
+  .base-item:hover { background: rgba(255,255,255,0.04); }
+  .base-icon { font-size:14px; margin-top:1px; flex-shrink:0; }
+  .base-name { font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:600; color:#ddeeff; line-height:1.2; }
+  .base-detail { font-family:'Share Tech Mono',monospace; font-size:9px; color:#4a6a7a; margin-top:2px; letter-spacing:.5px; line-height:1.4; }
+  .base-status {
+    margin-left:auto; flex-shrink:0;
+    font-family:'Share Tech Mono',monospace; font-size:9px;
+    padding:2px 6px; letter-spacing:1px; text-transform:uppercase;
+    border-radius:2px; align-self:flex-start; margin-top:1px;
+  }
+  .status-hit    { background:rgba(255,34,34,0.15); color:var(--red); border:1px solid rgba(255,34,34,0.3); }
+  .status-alert  { background:rgba(255,179,0,0.12); color:var(--amber); border:1px solid rgba(255,179,0,0.25); }
+  .status-active { background:rgba(41,121,255,0.12); color:var(--blue); border:1px solid rgba(41,121,255,0.25); }
+  .status-struck { background:rgba(213,0,249,0.12); color:var(--purple); border:1px solid rgba(213,0,249,0.25); }
+  .status-patrol { background:rgba(0,229,255,0.10); color:var(--cyan); border:1px solid rgba(0,229,255,0.2); }
+
+  /* ─── MAP ─── */
+  #map {
+    grid-row: 2; grid-column: 2;
+    position: relative;
+  }
+  .leaflet-container { background: #07111c; }
+
+  /* ─── FOOTER ─── */
+  footer {
+    grid-column: 1 / -1;
+    display: flex; align-items:center; justify-content:space-between;
+    padding: 0 20px;
+    background: linear-gradient(90deg,#07111c,#050a0f,#07111c);
+    border-top: 1px solid var(--border);
+    font-family:'Share Tech Mono',monospace; font-size:9px; color:#3a5a6a;
+    letter-spacing:1.2px;
+  }
+  .footer-sources { display:flex; gap:16px; }
+  .footer-scroll {
+    overflow:hidden; white-space:nowrap; flex:1; text-align:center;
+    position:relative;
+  }
+  .ticker-wrap {
+    display:inline-block; animation: ticker 45s linear infinite;
+    color: #5a7a8a;
+  }
+  @keyframes ticker { 0%{transform:translateX(120%)} 100%{transform:translateX(-100%)} }
+
+  /* ─── LEAFLET CUSTOM ─── */
+  .leaflet-tile { filter: brightness(0.55) saturate(0.4) hue-rotate(175deg); }
+
+  .leaflet-popup-content-wrapper {
+    background: rgba(5,15,28,0.97) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+    border-radius: 2px !important;
+    font-family: 'Barlow Condensed', sans-serif !important;
+    box-shadow: 0 0 20px rgba(0,0,0,0.8) !important;
+    max-width: 260px;
+  }
+  .leaflet-popup-tip { background: rgba(5,15,28,0.97) !important; }
+  .leaflet-popup-content { margin: 12px 14px !important; }
+  .pop-title { font-size:14px; font-weight:700; color:#fff; letter-spacing:1px; margin-bottom:5px; }
+  .pop-status { font-family:'Share Tech Mono',monospace; font-size:9px; padding:2px 6px; display:inline-block; margin-bottom:7px; border-radius:2px; }
+  .pop-body { font-size:11px; line-height:1.55; color:#8aaabb; }
+  .pop-source { font-family:'Share Tech Mono',monospace; font-size:8px; color:#3a5a6a; margin-top:6px; border-top:1px solid rgba(255,255,255,0.06); padding-top:5px; }
+
+  .map-legend {
+    position:absolute; bottom:14px; right:14px; z-index:1000;
+    background: rgba(5,12,22,0.9); border:1px solid var(--border);
+    padding:10px 14px; min-width:180px;
+    font-family:'Share Tech Mono',monospace;
+  }
+  .legend-title { font-size:9px; letter-spacing:2px; color:var(--cyan); margin-bottom:8px; text-transform:uppercase; }
+  .legend-item { display:flex; align-items:center; gap:8px; margin-bottom:5px; font-size:10px; color:#7a9bb5; }
+  .legend-line { width:28px; height:2px; flex-shrink:0; }
+  .legend-swatch { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+  @keyframes pulse-red {
+    0%{transform:scale(1); opacity:1}
+    50%{transform:scale(1.6); opacity:0.4}
+    100%{transform:scale(1); opacity:1}
+  }
+  @keyframes pulse-amber {
+    0%{transform:scale(1); opacity:1}
+    60%{transform:scale(1.5); opacity:0.5}
+    100%{transform:scale(1); opacity:1}
+  }
+  .pulse-red-outer {
+    border-radius:50%; background:rgba(255,34,34,0.25);
+    animation: pulse-red 1.4s ease-in-out infinite;
+  }
+  .pulse-amber-outer {
+    border-radius:50%; background:rgba(255,179,0,0.2);
+    animation: pulse-amber 2s ease-in-out infinite;
+  }
+
+  /* ─── DYNAMIC UPDATE INDICATORS ─── */
+  @keyframes flashUpdate {
+    0% { background: rgba(57,255,20,0.15); }
+    100% { background: transparent; }
+  }
+  .base-item.just-updated {
+    animation: flashUpdate 2s ease-out;
+  }
+  .base-item .new-intel-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 7px; letter-spacing: 1px;
+    color: var(--green); background: rgba(57,255,20,0.12);
+    border: 1px solid rgba(57,255,20,0.3);
+    padding: 1px 5px; border-radius: 2px;
+    margin-left: 6px; text-transform: uppercase;
+    animation: liveBlink 1.5s ease-in-out infinite;
+  }
+  .sidebar-update-banner {
+    padding: 6px 14px;
+    background: rgba(57,255,20,0.06);
+    border-bottom: 1px solid rgba(57,255,20,0.15);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px; color: var(--green);
+    letter-spacing: 1.5px; text-align: center;
+    display: none;
+  }
+  .sidebar-update-banner.visible { display: block; }
+  .status-unconfirmed {
+    background: rgba(57,255,20,0.10);
+    color: var(--green);
+    border: 1px solid rgba(57,255,20,0.25);
+  }
+
+  /* ─── LIVE INTEL FEED PANEL ─── */
+  .intel-toggle {
+    position: absolute; top: 12px; left: 12px; z-index: 1001;
+    background: rgba(5,15,25,0.95); border: 1px solid var(--green);
+    color: var(--green); font-family: 'Share Tech Mono', monospace;
+    font-size: 11px; letter-spacing: 2px; padding: 8px 14px;
+    cursor: pointer; text-transform: uppercase;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 0 15px rgba(57,255,20,0.15);
+  }
+  .intel-toggle:hover { background: rgba(57,255,20,0.1); box-shadow: 0 0 25px rgba(57,255,20,0.25); }
+  .intel-toggle .pulse-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green); box-shadow: 0 0 6px var(--green);
+    animation: liveBlink 1.2s ease-in-out infinite;
+  }
+
+  .intel-panel {
+    position: absolute; top: 0; left: 0; z-index: 1000;
+    width: 420px; height: 100%;
+    background: rgba(3,10,18,0.97);
+    border-right: 1px solid var(--green);
+    transform: translateX(-100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex; flex-direction: column;
+    box-shadow: 5px 0 30px rgba(0,0,0,0.6);
+  }
+  .intel-panel.open { transform: translateX(0); }
+
+  .intel-header {
+    padding: 14px 16px;
+    background: rgba(57,255,20,0.04);
+    border-bottom: 1px solid rgba(57,255,20,0.2);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .intel-header-left { display: flex; align-items: center; gap: 10px; }
+  .intel-header-title {
+    font-family: 'Oswald', sans-serif; font-size: 16px; font-weight: 700;
+    letter-spacing: 3px; color: var(--green); text-transform: uppercase;
+    text-shadow: 0 0 12px rgba(57,255,20,0.4);
+  }
+  .intel-header-sub {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    color: #4a7a5a; letter-spacing: 1px; margin-top: 2px;
+  }
+  .intel-close {
+    background: none; border: 1px solid rgba(255,255,255,0.1);
+    color: #5a7a6a; font-size: 18px; cursor: pointer;
+    width: 30px; height: 30px; display: flex; align-items: center;
+    justify-content: center; transition: all 0.2s;
+  }
+  .intel-close:hover { border-color: var(--red); color: var(--red); }
+
+  .intel-controls {
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(57,255,20,0.1);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px;
+  }
+  .intel-refresh-btn {
+    background: rgba(57,255,20,0.08); border: 1px solid rgba(57,255,20,0.3);
+    color: var(--green); font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; letter-spacing: 1.5px; padding: 6px 12px;
+    cursor: pointer; text-transform: uppercase; transition: all 0.2s;
+  }
+  .intel-refresh-btn:hover { background: rgba(57,255,20,0.15); }
+  .intel-refresh-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .intel-refresh-btn.loading {
+    animation: loadPulse 1s ease-in-out infinite;
+  }
+  @keyframes loadPulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+  .intel-status {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px; color: #3a5a4a; letter-spacing: 1px;
+  }
+  .intel-auto-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px; color: #4a6a5a; letter-spacing: 1px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .intel-auto-label input { accent-color: var(--green); }
+
+  .intel-feed {
+    flex: 1; overflow-y: auto; padding: 0;
+  }
+  .intel-feed::-webkit-scrollbar { width: 4px; }
+  .intel-feed::-webkit-scrollbar-track { background: transparent; }
+  .intel-feed::-webkit-scrollbar-thumb { background: rgba(57,255,20,0.2); border-radius: 2px; }
+
+  .intel-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.15s;
+    animation: intelFadeIn 0.4s ease-out;
+  }
+  @keyframes intelFadeIn { from{opacity:0; transform:translateY(-8px)} to{opacity:1; transform:translateY(0)} }
+  .intel-item:hover { background: rgba(57,255,20,0.03); }
+  .intel-item-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .intel-item-source {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    color: var(--cyan); letter-spacing: 1.5px; text-transform: uppercase;
+  }
+  .intel-item-time {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    color: #3a5a4a; letter-spacing: 1px;
+  }
+  .intel-item-headline {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 14px;
+    font-weight: 600; color: #ddeeff; line-height: 1.3; margin-bottom: 5px;
+  }
+  .intel-item-body {
+    font-size: 12px; line-height: 1.5; color: #7a9aaa;
+  }
+  .intel-item-url {
+    display: block; margin-top: 6px;
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    color: var(--green); opacity: 0.6; text-decoration: none;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    letter-spacing: 0.5px;
+  }
+  .intel-item-url:hover { opacity: 1; text-decoration: underline; }
+
+  .intel-item.breaking {
+    border-left: 3px solid var(--red);
+    background: rgba(255,34,34,0.04);
+  }
+  .intel-item.breaking .intel-item-source { color: var(--red); }
+
+  .intel-empty {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%; gap: 14px;
+    color: #3a5a4a;
+  }
+  .intel-empty-icon { font-size: 32px; opacity: 0.4; }
+  .intel-empty-text {
+    font-family: 'Share Tech Mono', monospace; font-size: 11px;
+    letter-spacing: 1.5px; text-transform: uppercase; text-align: center;
+  }
+
+  .intel-error {
+    padding: 16px; text-align: center;
+    font-family: 'Share Tech Mono', monospace; font-size: 11px;
+    color: var(--amber); letter-spacing: 1px;
+  }
+
+  /* ─── MOBILE ─── */
+  @media (max-width: 900px) {
+    body {
+      grid-template-columns: 1fr;
+      grid-template-rows: 50px 1fr 38px;
+    }
+    aside { display: none; }
+    #map { grid-column: 1; }
+    footer { grid-column: 1; }
+    .header-right .stat-box { display: none; }
+    .header-right .vdiv { display: none; }
+    .header-sub { display: none; }
+    .header-title { font-size: 16px; letter-spacing: 2px; }
+    .footer-sources { display: none; }
+    .footer-scroll { text-align: left; }
+    .intel-panel { width: 100%; }
+    .map-legend { display: none; }
+  }
+  @media (max-width: 600px) {
+    .header-title { font-size: 13px; letter-spacing: 1px; }
+    .op-badge { font-size: 8px; padding: 2px 6px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-left">
+    <div class="op-badge">● LIVE</div>
+    <div>
+      <div class="header-title"><span>OPERATION</span> EPIC FURY</div>
+      <div class="header-sub">JOINT US–ISRAELI MILITARY CAMPAIGN · PENTAGON / IDF · FEB 28, 2026 · 0230 ET LAUNCH</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="stat-box">
+      <div class="stat-val red" id="statStruck">6</div>
+      <div class="stat-lbl">Bases Struck</div>
+    </div>
+    <div class="vdiv"></div>
+    <div class="stat-box">
+      <div class="stat-val amber" id="statAlert">5</div>
+      <div class="stat-lbl">On Alert</div>
+    </div>
+    <div class="vdiv"></div>
+    <div class="stat-box">
+      <div class="stat-val cyan" id="statIranHit">4+</div>
+      <div class="stat-lbl">Iranian Sites Hit</div>
+    </div>
+    <div class="vdiv"></div>
+    <div class="stat-box">
+      <div class="stat-val" style="color:#fff" id="statCarriers">2</div>
+      <div class="stat-lbl">Carrier Groups</div>
+    </div>
+    <div class="vdiv"></div>
+    <div>
+      <span class="live-dot"></span>
+      <span class="live-label">ACTIVE CONFLICT</span><br>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#3a5a6a;margin-top:2px;text-align:right;" id="clock">--:-- UTC</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:#2a4a3a;margin-top:1px;text-align:right;" id="lastUpdate"></div>
+    </div>
+  </div>
+</header>
+
+<!-- SIDEBAR (dynamically rendered from baseRegistry) -->
+<aside id="sidebarContent">
+  <!-- Populated by renderSidebar() -->
+</aside>
+
+<!-- MAP -->
+<div id="map">
+  <!-- Intel toggle button (inside map) -->
+  <button class="intel-toggle" id="intelToggle" onclick="toggleIntel()">
+    <div class="pulse-dot"></div>
+    LIVE INTEL FEED
+  </button>
+
+  <!-- Intel panel (slides over map) -->
+  <div class="intel-panel" id="intelPanel">
+    <div class="intel-header">
+      <div class="intel-header-left">
+        <div class="dot green"></div>
+        <div>
+          <div class="intel-header-title">LIVE INTEL FEED</div>
+          <div class="intel-header-sub">MULTI-SOURCE OSINT · GNEWS · NEWSDATA · RSS</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="intel-close" onclick="toggleSettings()" title="API Key Settings" style="font-size:15px;">⚙</button>
+        <button class="intel-close" onclick="toggleIntel()">✕</button>
+      </div>
+    </div>
+
+    <!-- API KEY SETTINGS PANEL -->
+    <div id="settingsPanel" style="display:none;padding:14px 16px;background:rgba(57,255,20,0.03);border-bottom:1px solid rgba(57,255,20,0.15);">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--green);margin-bottom:10px;">⚙ API KEYS (OPTIONAL — SAVED LOCALLY)</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#4a6a5a;margin-bottom:10px;line-height:1.6;">
+        RSS feeds work with zero config.<br>Add keys below for richer, faster results.
+      </div>
+      <div style="margin-bottom:8px;">
+        <label style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:1px;display:block;margin-bottom:3px;">
+          GNEWS.IO <a href="https://gnews.io" target="_blank" style="color:var(--green);text-decoration:none;opacity:0.6;">(free: 100/day)</a>
+        </label>
+        <input id="keyGnews" type="password" placeholder="Enter GNews API key..." style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border);color:var(--text);padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;">
+      </div>
+      <div style="margin-bottom:8px;">
+        <label style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:1px;display:block;margin-bottom:3px;">
+          NEWSDATA.IO <a href="https://newsdata.io" target="_blank" style="color:var(--green);text-decoration:none;opacity:0.6;">(free: 200/day)</a>
+        </label>
+        <input id="keyNewsdata" type="password" placeholder="Enter NewsData API key..." style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border);color:var(--text);padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:1px;display:block;margin-bottom:3px;">
+          CURRENTS API <a href="https://currentsapi.services/en/register" target="_blank" style="color:var(--green);text-decoration:none;opacity:0.6;">(free: 600/day)</a>
+        </label>
+        <input id="keyCurrents" type="password" placeholder="Enter Currents API key..." style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border);color:var(--text);padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;">
+      </div>
+      <button onclick="saveKeys()" style="background:rgba(57,255,20,0.1);border:1px solid rgba(57,255,20,0.3);color:var(--green);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;padding:7px 16px;cursor:pointer;text-transform:uppercase;width:100%;">SAVE KEYS</button>
+    </div>
+    <div class="intel-controls">
+      <button class="intel-refresh-btn" id="refreshBtn" onclick="fetchIntel()">
+        ↻ FETCH LATEST
+      </button>
+      <label class="intel-auto-label">
+        <input type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()">
+        AUTO (5 MIN)
+      </label>
+      <div class="intel-status" id="intelStatus">READY</div>
+    </div>
+    <div class="intel-feed" id="intelFeed">
+      <div class="intel-empty">
+        <div class="intel-empty-icon">📡</div>
+        <div class="intel-empty-text">Click "FETCH LATEST" to pull<br>live intel from news APIs + RSS feeds<br><br><span style="color:#2a4a3a;font-size:9px;">Works out of the box via RSS · Add API keys via ⚙ for more</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-sources">
+    <span>SRC: REUTERS</span><span>·</span>
+    <span>AL JAZEERA</span><span>·</span>
+    <span>BBC</span><span>·</span>
+    <span>GNEWS</span><span>·</span>
+    <span>NEWSDATA</span><span>·</span>
+    <span>RSS FEEDS</span>
+  </div>
+  <div class="footer-scroll">
+    <span class="ticker-wrap" id="tickerWrap">
+      ● IRAN INTERNET SHUTDOWN CONFIRMED (NETBLOCKS) &nbsp;·&nbsp;
+      ● ISRAEL STATE OF EMERGENCY DECLARED — DEF MIN KATZ &nbsp;·&nbsp;
+      ● SECOND IRANIAN MISSILE BARRAGE TOWARD ISRAEL CONFIRMED — IDF &nbsp;·&nbsp;
+      ● 1 KILLED IN ABU DHABI FROM INTERCEPTED MISSILE SHRAPNEL — UAE WAM &nbsp;·&nbsp;
+      ● IRAN FM: "ALL US AND ISRAELI ASSETS IN MIDDLE EAST ARE LEGITIMATE TARGETS — NO RED LINES" &nbsp;·&nbsp;
+      ● QATAR, UAE, KUWAIT, BAHRAIN, IRAQ AIRSPACE CLOSED &nbsp;·&nbsp;
+      ● USS GERALD R. FORD CSG POSITIONED OFF ISRAELI COAST — PENTAGON &nbsp;·&nbsp;
+      ● TRUMP: "MAJOR COMBAT OPERATIONS" — TRUTH SOCIAL 0231 ET &nbsp;·&nbsp;
+      ● NETANYAHU: "LION'S ROAR — OPERATION TO REMOVE EXISTENTIAL THREAT" &nbsp;·&nbsp;
+    </span>
+  </div>
+  <div style="font-family:'Share Tech Mono',monospace;font-size:9px;text-align:right;">
+    CLASSIFICATION: UNCLASSIFIED // OPEN SOURCE ONLY<br>
+    <span style="color:#2a3a4a;">© OPEN-SOURCE INTELLIGENCE COMPILATION 2026</span>
+  </div>
+</footer>
+
+<!-- MAP LEGEND OVERLAY -->
+<div class="map-legend" id="map-legend">
+  <div class="legend-title">Range Circles</div>
+  <div class="legend-item">
+    <div class="legend-line" style="background:rgba(213,0,249,0.7);height:2px;border-top:2px dashed rgba(213,0,249,0.7);"></div>
+    <span>Iran Ballistic (~2,000km)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-line" style="border-top:2px dashed rgba(0,229,255,0.5);height:0;"></div>
+    <span>Tomahawk TLAM (~1,600km)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-line" style="border-top:2px dashed rgba(41,121,255,0.5);height:0;"></div>
+    <span>F-35 Strike Radius (~2,200km)</span>
+  </div>
+  <div style="margin-top:10px; border-top:1px solid rgba(255,255,255,0.06); padding-top:8px;">
+    <div class="legend-title">Markers</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--red);box-shadow:0 0 5px var(--red)"></div><span>Base Attacked (Iran)</span></div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--amber);box-shadow:0 0 5px var(--amber)"></div><span>On Alert</span></div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--blue);box-shadow:0 0 5px var(--blue)"></div><span>Israeli Offensive Base</span></div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--cyan);box-shadow:0 0 5px var(--cyan)"></div><span>US Naval Group</span></div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--purple);box-shadow:0 0 5px var(--purple)"></div><span>Iranian Site Struck</span></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CLOCK
+// ══════════════════════════════════════════════════════════════
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getUTCHours()).padStart(2,'0');
+  const m = String(now.getUTCMinutes()).padStart(2,'0');
+  const s = String(now.getUTCSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = h+':'+m+':'+s+' UTC';
+}
+setInterval(updateClock, 1000); updateClock();
+
+// ══════════════════════════════════════════════════════════════
+// COLORS
+// ══════════════════════════════════════════════════════════════
+const RED='#ff2222', AMBER='#ffb300', BLUE='#2979ff', GREEN='#39ff14', PURPLE='#d500f9', CYAN='#00e5ff';
+
+// ══════════════════════════════════════════════════════════════
+// CENTRAL DATA MODEL — single source of truth for everything
+// ══════════════════════════════════════════════════════════════
+// Status hierarchy (lower index = more severe, can only escalate):
+const STATUS_SEVERITY = ['hit','struck','targeted','active','alert','deployed','critical','unconfirmed'];
+
+// Each entry drives: map marker, sidebar item, header counters, popup
+const baseRegistry = [
+  // ── ATTACKED (red) ──
+  { id:'aludeid', name:'Al Udeid Air Base', region:'QATAR', lat:25.117, lng:51.316,
+    category:'attacked', status:'hit', zoom:10,
+    detail:'Largest US base in Middle East<br>~10,000 personnel · B-52 staging',
+    body:'Largest US base in Middle East. ~10,000 personnel, B-52 bombers. Ballistic missile strikes confirmed by Al Jazeera & Fars News. Qatar CAA suspended airspace.',
+    sources:'AL JAZEERA · REUTERS · FARS NEWS',
+    aliases:['al udeid','al-udeid','udeid','qatar base','qatar air base'],
+    newsUpdates:[] },
+
+  { id:'5thfleet', name:'US 5th Fleet HQ / NSA Bahrain', region:'BAHRAIN', lat:26.208, lng:50.616,
+    category:'attacked', status:'hit', zoom:11,
+    detail:'Juffair District<br>Naval HQ, reduced to &lt;100 personnel',
+    body:'Juffair district. US Navy 5th Fleet headquarters. Smoke reported near base. Bahrain confirmed missile attack. US Embassy: "imminent drone/missile attack" alert issued.',
+    sources:'CNBC · AXIOS · BAHRAIN GOVT',
+    aliases:['5th fleet','bahrain','nsa bahrain','juffair','bahrain base'],
+    newsUpdates:[] },
+
+  { id:'alialsalem', name:'Ali Al Salem Air Base', region:'KUWAIT', lat:29.450, lng:47.521,
+    category:'attacked', status:'hit', zoom:10,
+    detail:'US Air Force operations<br>IRGC confirmed strike',
+    body:'US Air Force operations base. IRGC confirmed strike via Fars News. Multiple explosions across Kuwait. Airspace closed.',
+    sources:'CBS · AL JAZEERA · IRAN FARS',
+    aliases:['ali al salem','ali al-salem','kuwait air base','ali salem'],
+    newsUpdates:[] },
+
+  { id:'aldhafra', name:'Al Dhafra Air Base', region:'UAE', lat:24.241, lng:54.547,
+    category:'attacked', status:'hit', zoom:10,
+    detail:'F-35/F-22 · ~3,500 US personnel<br>IRGC drills simulated this target Feb 26',
+    body:'Hosts F-35, F-22, ~3,500 US personnel. IRGC ran attack-simulation drills against this base on Feb 26. 1 civilian killed in Abu Dhabi by intercepted missile shrapnel.',
+    sources:'CBS · FARS · MIDDLE EAST EYE',
+    aliases:['al dhafra','dhafra','uae base','abu dhabi base','al-dhafra'],
+    newsUpdates:[] },
+
+  { id:'princesultan', name:'Prince Sultan Air Base', region:'SAUDI ARABIA', lat:24.063, lng:47.562,
+    category:'attacked', status:'hit', zoom:9,
+    detail:'Explosions in Riyadh<br>US bases confirmed struck by Axios/CBS',
+    body:'Explosions reported in Riyadh. US bases in Saudi Arabia confirmed struck by Iranian missiles per Axios and CBS News. Saudi Arabia officially opposed use of its territory.',
+    sources:'AXIOS · CBS · REUTERS',
+    aliases:['prince sultan','saudi base','riyadh base','saudi arabia base'],
+    newsUpdates:[] },
+
+  { id:'jordan', name:'US Bases — Jordan', region:'JORDAN', lat:31.827, lng:36.787,
+    category:'attacked', status:'targeted', zoom:9,
+    detail:'Muwaffaq Salti / Tower 22<br>Targeted per CBS News US officials',
+    body:'US sources told CBS News that bases in Jordan were targeted. Includes Muwaffaq Salti / Tower 22. No confirmed hits at time of publication.',
+    sources:'CBS NEWS · TASNIM',
+    aliases:['jordan base','tower 22','muwaffaq salti','jordan military'],
+    newsUpdates:[] },
+
+  // ── ON ALERT (amber) ──
+  { id:'alasad', name:'Al-Asad Air Base', region:'IRAQ (Anbar)', lat:33.806, lng:42.440,
+    category:'alert', status:'alert', zoom:9,
+    detail:'Major US air base<br>Previously struck by Iran in 2020',
+    body:'Major US air base in Anbar province. Targeted by Iranian ballistic missiles in 2020 (TBI injuries). Under elevated force protection. Iraq closed national airspace.',
+    sources:'PENTAGON · NBC · WIKIPEDIA',
+    aliases:['al-asad','al asad','asad base','anbar base','ain al-asad'],
+    newsUpdates:[] },
+
+  { id:'erbil', name:'Erbil Base / Coalition HQ', region:'IRAQ (Kurdistan)', lat:36.234, lng:43.956,
+    category:'alert', status:'alert', zoom:10,
+    detail:'Iraq airspace closed<br>IRGC proxy threat elevated',
+    body:'US military presence at Erbil, Kurdistan region. IRGC proxies have struck this location before. Iraq closed airspace. Shelter-in-place for all US personnel.',
+    sources:'NBC · PENTAGON',
+    aliases:['erbil','kurdistan base','erbil base','coalition hq iraq'],
+    newsUpdates:[] },
+
+  { id:'altanf', name:'Al-Tanf Garrison', region:'SYRIA', lat:33.507, lng:38.674,
+    category:'alert', status:'alert', zoom:8,
+    detail:'~200 US SOF · Tripoint border<br>Iran-aligned militia nearby',
+    body:'~200 US SOF at Syrian-Iraqi-Jordanian tripoint. Iran-aligned militias operate in surrounding area. Elevated threat.',
+    sources:'PENTAGON',
+    aliases:['al-tanf','al tanf','tanf garrison','syria garrison','at-tanf'],
+    newsUpdates:[] },
+
+  { id:'arifjan', name:'Camp Arifjan', region:'KUWAIT', lat:28.873, lng:48.168,
+    category:'alert', status:'alert', zoom:9,
+    detail:'US Army logistics hub<br>Explosions reported in Kuwait',
+    body:'Major US Army logistics hub. Explosions reported across Kuwait. Adjacent to Ali Al Salem strike zone.',
+    sources:'CBS · AL JAZEERA',
+    aliases:['camp arifjan','arifjan','kuwait army base'],
+    newsUpdates:[] },
+
+  // ── ISRAELI OFFENSE (blue) ──
+  { id:'nevatim', name:'Nevatim Air Base', region:'ISRAEL (Negev)', lat:31.210, lng:35.054,
+    category:'offense', status:'active', zoom:10,
+    detail:'F-35I "Adir" primary base<br>Main launch point for Iran strikes',
+    body:'Primary F-35I "Adir" base. Main launch point for Israeli strikes on Iran under Operation Lion\'s Roar. Under incoming Iranian missile threat — state of emergency declared.',
+    sources:'IDF · CBS · REUTERS',
+    aliases:['nevatim','nevatim base','negev base','f-35i base'],
+    newsUpdates:[] },
+
+  { id:'ramon', name:'Ramon Air Base', region:'ISRAEL (Negev)', lat:29.725, lng:35.006,
+    category:'offense', status:'active', zoom:10,
+    detail:'IDF+USAF F-35s<br>US Embassy shelter-in-place issued',
+    body:'Dual-use IDF/USAF base in Negev. Hosts US F-35 rotational forces. Israel closed all civilian airspace. US Embassy Jerusalem: shelter-in-place for all personnel.',
+    sources:'IDF · NBC · CBS',
+    aliases:['ramon','ramon base','ramon air base'],
+    newsUpdates:[] },
+
+  // ── CARRIER GROUPS (cyan) ──
+  { id:'ford', name:'USS Gerald R. Ford CSG', region:'Off Israeli Coast', lat:32.5, lng:34.2,
+    category:'naval', status:'deployed', zoom:8, iconType:'naval', iconLabel:'FORD CSG',
+    detail:'Off Israeli coast (deployed Feb 27)<br>Tomahawk + air wing strike capability',
+    body:'Aircraft carrier strike group. Deployed off Israeli coast Feb 27. Provides Tomahawk strike capability, air defense umbrella, and F-18 strike aircraft. Part of 2-carrier buildup.',
+    sources:'AXIOS · NBC · PENTAGON',
+    aliases:['ford','cvn-78','gerald ford','ford csg','ford carrier'],
+    newsUpdates:[] },
+
+  { id:'lincoln', name:'USS Abraham Lincoln CSG', region:'Persian Gulf', lat:26.5, lng:56.5,
+    category:'naval', status:'deployed', zoom:7, iconType:'naval', iconLabel:'LINCOLN CSG',
+    detail:'Persian Gulf · F-35 intercept Feb 3<br>Primary strike group for Iran ops',
+    body:'Aircraft carrier strike group. Persian Gulf. F-35 shot down Iranian Shahed-139 drone approaching Lincoln on Feb 3. Primary platform for Operation Epic Fury strikes on Iran.',
+    sources:'WIKIPEDIA · NBC · PENTAGON',
+    aliases:['lincoln','cvn-72','abraham lincoln','lincoln csg','lincoln carrier'],
+    newsUpdates:[] },
+
+  // ── IRANIAN TARGETS (purple) ──
+  { id:'tehran', name:'Tehran — Multiple Districts', region:'IRAN', lat:35.689, lng:51.389,
+    category:'iranian', status:'struck', zoom:9, iconType:'explosion', iconLabel:'TEHRAN',
+    detail:'Khamenei residence · Ministry of Defense<br>IRGC HQ · University St · Jomhouri Area',
+    body:'Multiple confirmed strikes: University St, Jomhouri area, Seyyed Khandan (N. Tehran). Khamenei\'s residence reported as target. Iranian internet shut down by government.',
+    sources:'REUTERS · AP · FARS · AL JAZEERA',
+    aliases:['tehran','khamenei','irgc hq','iranian capital','jomhouri'],
+    newsUpdates:[] },
+
+  { id:'natanz', name:'Natanz Nuclear Facility', region:'IRAN (Isfahan)', lat:33.722, lng:51.728,
+    category:'iranian', status:'struck', zoom:9, iconType:'explosion', iconLabel:'NATANZ',
+    detail:'Main enrichment site · Isfahan Province<br>Previously hit June 2025',
+    body:'Main uranium enrichment site in Isfahan Province. Previously struck in June 2025 US campaign. Satellite imagery showed accelerated missile site repairs since then.',
+    sources:'REUTERS · NYT · AXIOS',
+    aliases:['natanz','natanz nuclear','natanz enrichment','isfahan nuclear'],
+    newsUpdates:[] },
+
+  { id:'fordow', name:'Fordow (FFEP) — Underground Enrichment', region:'IRAN (Qom)', lat:34.883, lng:50.983,
+    category:'iranian', status:'struck', zoom:9, iconType:'explosion', iconLabel:'FORDOW',
+    detail:'Underground enrichment · Near Qom<br>High-value hardened target',
+    body:'Deeply buried enrichment facility near Qom. Protected by mountain. High-value target for US bunker-buster munitions in nuclear dismantlement campaign.',
+    sources:'REUTERS · AXIOS',
+    aliases:['fordow','ffep','qom nuclear','fordow enrichment','fordo'],
+    newsUpdates:[] },
+
+  { id:'ilam', name:'Ilam Province — West Iran IRGC', region:'IRAN (West)', lat:33.637, lng:46.423,
+    category:'iranian', status:'struck', zoom:8, iconType:'explosion', iconLabel:'ILAM',
+    detail:'IRGC installations · IDF confirmed<br>Missile storage / launch sites',
+    body:'IDF confirmed strikes in western Iran including Ilam province. IRGC missile storage and launch infrastructure targeted.',
+    sources:'IDF · AL JAZEERA',
+    aliases:['ilam','ilam province','western iran irgc'],
+    newsUpdates:[] },
+
+  // ── CHOKEPOINT (special) ──
+  { id:'hormuz', name:'Strait of Hormuz', region:'Strategic Chokepoint', lat:26.567, lng:56.25,
+    category:'chokepoint', status:'critical', zoom:8, iconType:'warning',
+    detail:'20% global oil supply · Iran closed briefly<br>IRGC seized 2 tankers Feb 5',
+    body:'~20% of global oil transits through here daily. Iran briefly closed Strait during Feb 17 military drills. IRGC seized 2 tankers near Farsi Island on Feb 5. If closed: severe global energy shock. Oil prices already at 6-month highs.',
+    sources:'CNBC · REUTERS · WIKIPEDIA',
+    aliases:['hormuz','strait of hormuz','persian gulf strait','oil chokepoint','hormuz strait'],
+    newsUpdates:[] },
+];
+
+// Track Leaflet marker references for live updates
+const markerMap = {}; // id → L.marker
+
+// ══════════════════════════════════════════════════════════════
+// MAP INIT
+// ══════════════════════════════════════════════════════════════
+const map = L.map('map', {
+  center: [30, 50], zoom: 5,
+  zoomControl: false, attributionControl: false
+});
+L.control.zoom({ position: 'topright' }).addTo(map);
+L.control.attribution({ position: 'bottomleft', prefix: '' }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap', maxZoom: 12
+}).addTo(map);
+document.getElementById('map').appendChild(document.getElementById('map-legend'));
+
+window.flyTo = function(lat,lng,z){ map.flyTo([lat,lng],z,{duration:1.2}); }
+
+// ══════════════════════════════════════════════════════════════
+// ICON FACTORIES
+// ══════════════════════════════════════════════════════════════
+function makeIcon(color, size, pulse) {
+  const r = size/2, pr = size * 1.8;
+  const pulseAnim = pulse ? `
+    <circle cx="${pr}" cy="${pr}" r="${r}" fill="${color}" opacity="0.5">
+      <animate attributeName="r" from="${r}" to="${pr*0.85}" dur="${pulse}s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" from="0.6" to="0" dur="${pulse}s" repeatCount="indefinite"/>
+    </circle>` : '';
+  const html = `<svg width="${pr*2}" height="${pr*2}" viewBox="0 0 ${pr*2} ${pr*2}" xmlns="http://www.w3.org/2000/svg">
+    ${pulseAnim}
+    <circle cx="${pr}" cy="${pr}" r="${r+3}" fill="${color}" opacity="0.25"/>
+    <circle cx="${pr}" cy="${pr}" r="${r}" fill="${color}"/>
+    <circle cx="${pr}" cy="${pr}" r="${r*0.5}" fill="rgba(255,255,255,0.7)"/>
+  </svg>`;
+  return L.divIcon({ html, iconSize:[pr*2,pr*2], iconAnchor:[pr,pr], className:'' });
+}
+function makeExplosionIcon(label) {
+  return L.divIcon({
+    html:`<div style="text-align:center"><div style="font-size:20px;line-height:1;filter:drop-shadow(0 0 6px rgba(255,100,0,0.8))">💥</div><div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:#ff6600;white-space:nowrap;text-shadow:0 0 4px #ff4400;max-width:90px;text-align:center">${label}</div></div>`,
+    iconSize:[90,38], iconAnchor:[45,10], className:''
+  });
+}
+function makeNavalIcon(label) {
+  return L.divIcon({
+    html:`<div style="text-align:center"><div style="font-size:18px;line-height:1;filter:drop-shadow(0 0 8px rgba(0,229,255,0.9))">⚓</div><div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:#00e5ff;white-space:nowrap;text-shadow:0 0 4px #00e5ff">${label}</div></div>`,
+    iconSize:[120,34], iconAnchor:[60,9], className:''
+  });
+}
+function makeWarningIcon(label) {
+  return L.divIcon({
+    html:`<div style="text-align:center;animation:pulse-amber-outer 2s ease-in-out infinite"><div style="font-size:16px;line-height:1;filter:drop-shadow(0 0 8px rgba(255,179,0,0.9))">⚠️</div><div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:#ffb300;white-space:nowrap;text-shadow:0 0 4px #ffb300">${label || ''}</div></div>`,
+    iconSize:[120,32], iconAnchor:[60,8], className:''
+  });
+}
+function makeUnconfirmedIcon() {
+  return makeIcon(GREEN, 7, 2);
+}
+
+// ══════════════════════════════════════════════════════════════
+// ICON + STATUS RESOLUTION FROM DATA
+// ══════════════════════════════════════════════════════════════
+function getIconForBase(base) {
+  if (base.iconType === 'explosion') return makeExplosionIcon(base.iconLabel || '');
+  if (base.iconType === 'naval')     return makeNavalIcon(base.iconLabel || '');
+  if (base.iconType === 'warning')   return makeWarningIcon(base.name);
+  if (base.status === 'unconfirmed') return makeUnconfirmedIcon();
+
+  switch (base.category) {
+    case 'attacked':  return makeIcon(RED, 9, 1.2);
+    case 'alert':     return makeIcon(AMBER, 8, 2.5);
+    case 'offense':   return makeIcon(BLUE, 8, 2);
+    case 'naval':     return makeNavalIcon(base.iconLabel || base.name);
+    case 'iranian':   return makeExplosionIcon(base.iconLabel || '');
+    case 'chokepoint':return makeWarningIcon(base.name);
+    default:          return makeIcon(GREEN, 7, 2);
+  }
+}
+
+function getStatusConfig(base) {
+  const configs = {
+    hit:         { cls:'status-hit',    text:'⚠ CONFIRMED HIT', style:'background:rgba(255,34,34,0.15);color:#ff2222;border:1px solid rgba(255,34,34,0.4)', label:'HIT', icon:'🔴' },
+    struck:      { cls:'status-struck',  text:'☢ STRUCK',        style:'background:rgba(213,0,249,0.12);color:#d500f9;border:1px solid rgba(213,0,249,0.3)', label:'STRUCK', icon:'💥' },
+    targeted:    { cls:'status-hit',    text:'⚠ TARGETED',      style:'background:rgba(255,34,34,0.15);color:#ff2222;border:1px solid rgba(255,34,34,0.4)', label:'TARGETED', icon:'🔴' },
+    active:      { cls:'status-active', text:'✈ ACTIVE STRIKES', style:'background:rgba(41,121,255,0.12);color:#2979ff;border:1px solid rgba(41,121,255,0.3)', label:'ACTIVE', icon:'✈️' },
+    alert:       { cls:'status-alert',  text:'⚡ ON ALERT',      style:'background:rgba(255,179,0,0.12);color:#ffb300;border:1px solid rgba(255,179,0,0.3)', label:'ALERT', icon:'🟡' },
+    deployed:    { cls:'status-patrol', text:'⚓ DEPLOYED',      style:'background:rgba(0,229,255,0.10);color:#00e5ff;border:1px solid rgba(0,229,255,0.25)', label:'DEPLOYED', icon:'⚓' },
+    critical:    { cls:'status-alert',  text:'CRITICAL RISK',    style:'background:rgba(255,179,0,0.12);color:#ffb300;border:1px solid rgba(255,179,0,0.25)', label:'CRITICAL', icon:'⚠️' },
+    unconfirmed: { cls:'status-unconfirmed', text:'❓ UNCONFIRMED', style:'background:rgba(57,255,20,0.10);color:#39ff14;border:1px solid rgba(57,255,20,0.25)', label:'NEW INTEL', icon:'🟢' },
+  };
+  return configs[base.status] || configs.alert;
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER MAP MARKERS FROM DATA MODEL
+// ══════════════════════════════════════════════════════════════
+function renderMapMarkers() {
+  // Remove existing dynamic markers
+  Object.values(markerMap).forEach(m => map.removeLayer(m));
+
+  baseRegistry.forEach(base => {
+    const icon = getIconForBase(base);
+    const sc = getStatusConfig(base);
+
+    let newsSection = '';
+    if (base.newsUpdates.length > 0) {
+      const updates = base.newsUpdates.slice(-3).map(u =>
+        `<div style="font-size:9px;color:var(--green);margin-top:3px;border-left:2px solid rgba(57,255,20,0.3);padding-left:6px;">📡 ${escapeHtml(u)}</div>`
+      ).join('');
+      newsSection = `<div style="margin-top:6px;border-top:1px solid rgba(57,255,20,0.1);padding-top:5px;">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--green);letter-spacing:1px;margin-bottom:3px;">LIVE INTEL UPDATES</div>
+        ${updates}</div>`;
+    }
+
+    const pop = `<div class="pop-title">${escapeHtml(base.name)}${base.region ? ' — '+escapeHtml(base.region) : ''}</div>
+      <div class="pop-status" style="${sc.style}">${sc.text}</div>
+      <div class="pop-body">${base.body}</div>
+      ${newsSection}
+      <div class="pop-source">SRC: ${base.sources}</div>`;
+
+    const marker = L.marker([base.lat, base.lng], {icon}).addTo(map).bindPopup(pop, {maxWidth:280});
+    markerMap[base.id] = marker;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER SIDEBAR FROM DATA MODEL
+// ══════════════════════════════════════════════════════════════
+function renderSidebar() {
+  const sidebar = document.getElementById('sidebarContent');
+
+  const sections = [
+    { filter: b => b.category==='attacked', headClass:'attacked', dotClass:'red',
+      title:'Iranian Retaliatory Strikes (Confirmed)' },
+    { filter: b => b.category==='alert', headClass:'alert', dotClass:'amber',
+      title:'US/Coalition Bases — On Alert' },
+    { filter: b => b.category==='offense', headClass:'offense', dotClass:'blue',
+      title:'Israeli Offensive Bases (IDF / Lion\'s Roar)' },
+    { filter: b => b.category==='naval', headClass:'naval', dotClass:'cyan',
+      title:'US Naval Strike Groups' },
+    { filter: b => b.category==='iranian' || b.category==='chokepoint', headClass:'iran', dotClass:'purple',
+      title:'Iranian Sites Struck (US/Israel)' },
+    { filter: b => b.category==='new_intel', headClass:'intel', dotClass:'green',
+      title:'New Intel (From Live Feed)' },
+  ];
+
+  let html = '';
+
+  // Update banner
+  const totalUpdates = baseRegistry.reduce((n,b) => n + b.newsUpdates.length, 0);
+  html += `<div class="sidebar-update-banner ${totalUpdates > 0 ? 'visible' : ''}" id="sidebarBanner">
+    📡 ${totalUpdates} LIVE INTEL UPDATE${totalUpdates !== 1 ? 'S' : ''} APPLIED
+  </div>`;
+
+  sections.forEach(sec => {
+    const items = baseRegistry.filter(sec.filter);
+    if (items.length === 0) return;
+
+    html += `<div class="section-head ${sec.headClass}"><div class="dot ${sec.dotClass}"></div> ${sec.title}</div>`;
+    html += '<div class="base-list">';
+    items.forEach(base => {
+      const sc = getStatusConfig(base);
+      const hasUpdates = base.newsUpdates.length > 0;
+      html += `<div class="base-item ${hasUpdates ? 'just-updated' : ''}" onclick="flyTo(${base.lat},${base.lng},${base.zoom || 9})">
+        <div class="base-icon">${sc.icon}</div>
+        <div>
+          <div class="base-name">${escapeHtml(base.name)}${hasUpdates ? '<span class="new-intel-badge">UPDATED</span>' : ''}</div>
+          <div class="base-detail">${base.region ? base.region+' · ' : ''}${base.detail || ''}</div>
+          ${hasUpdates ? '<div class="base-detail" style="color:var(--green);margin-top:2px;">📡 '+escapeHtml(base.newsUpdates[base.newsUpdates.length-1])+'</div>' : ''}
+        </div>
+        <div class="base-status ${sc.cls}">${sc.label}</div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+
+  sidebar.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════
+// UPDATE HEADER STATS FROM DATA MODEL
+// ══════════════════════════════════════════════════════════════
+function updateHeaderStats() {
+  const attacked  = baseRegistry.filter(b => b.category==='attacked').length;
+  const onAlert   = baseRegistry.filter(b => b.category==='alert').length;
+  const iranHit   = baseRegistry.filter(b => b.category==='iranian').length;
+  const carriers  = baseRegistry.filter(b => b.category==='naval').length;
+
+  document.getElementById('statStruck').textContent   = attacked;
+  document.getElementById('statAlert').textContent    = onAlert;
+  document.getElementById('statIranHit').textContent   = iranHit + '+';
+  document.getElementById('statCarriers').textContent  = carriers;
+}
+
+// ══════════════════════════════════════════════════════════════
+// RANGE CIRCLES (static, drawn once)
+// ══════════════════════════════════════════════════════════════
+L.circle([35.689,51.389],{radius:2000000,color:PURPLE,weight:1.5,fillColor:PURPLE,fillOpacity:0.04,dashArray:'8,6'}).addTo(map).bindTooltip('Iran Ballistic Missile Range ~2,000km',{sticky:true,direction:'top'});
+L.circle([26.5,56.5],{radius:1600000,color:CYAN,weight:1,fillColor:CYAN,fillOpacity:0.025,dashArray:'6,5'}).addTo(map).bindTooltip('USS Lincoln — Tomahawk TLAM Range ~1,600km',{sticky:true,direction:'top'});
+L.circle([31.210,35.054],{radius:2200000,color:BLUE,weight:1,fillColor:BLUE,fillOpacity:0.025,dashArray:'5,5'}).addTo(map).bindTooltip('Israeli F-35I Strike Radius ~2,200km (w/ refueling)',{sticky:true,direction:'top'});
+L.circle([30.5,49.5],{radius:900000,color:RED,weight:1,fillColor:RED,fillOpacity:0.04,dashArray:'4,4'}).addTo(map).bindTooltip('IRGC Short-Range / Ballistic Threat Zone ~900km',{sticky:true,direction:'top'});
+
+// ══════════════════════════════════════════════════════════════
+// INITIAL RENDER
+// ══════════════════════════════════════════════════════════════
+renderMapMarkers();
+renderSidebar();
+updateHeaderStats();
+
+// ══════════════════════════════════════════════════════════════
+// INTELLIGENCE ANALYZER — scans news and updates the data model
+// ══════════════════════════════════════════════════════════════
+
+// Keywords that indicate a status escalation
+const ESCALATION_KEYWORDS = {
+  hit:      /\b(hit|struck|damaged|destroyed|attacked|bombed|missile.?hit|confirmed.?strike|explosion.?at|impact)\b/i,
+  targeted: /\b(targeted|target|incoming|inbound|launched.?at|fired.?at|aimed.?at)\b/i,
+  alert:    /\b(alert|warning|threat|elevated|shelter|evacuate|bracing|heightened)\b/i,
+};
+
+// Location keywords for potentially new sites
+const NEW_LOCATION_HINTS = [
+  { pattern:/\bincirlik\b/i,       name:'Incirlik Air Base',       region:'TURKEY',        lat:37.002, lng:35.426, category:'alert' },
+  { pattern:/\bdiego.?garcia\b/i,  name:'Diego Garcia',            region:'INDIAN OCEAN',  lat:-7.316, lng:72.411, category:'alert' },
+  { pattern:/\bcamp.?lemonnier\b/i,name:'Camp Lemonnier',          region:'DJIBOUTI',       lat:11.547, lng:43.159, category:'alert' },
+  { pattern:/\bbushehr\b/i,        name:'Bushehr Nuclear Plant',   region:'IRAN',           lat:28.832, lng:50.887, category:'iranian' },
+  { pattern:/\bisfahan\b/i,        name:'Isfahan — Military Sites', region:'IRAN',          lat:32.651, lng:51.676, category:'iranian' },
+  { pattern:/\bparchin\b/i,        name:'Parchin Military Complex',region:'IRAN',           lat:35.520, lng:51.775, category:'iranian' },
+  { pattern:/\bbandar.?abbas\b/i,  name:'Bandar Abbas Naval Base', region:'IRAN',           lat:27.183, lng:56.275, category:'iranian' },
+  { pattern:/\bkish\b/i,           name:'Kish Island',             region:'IRAN (Gulf)',     lat:26.535, lng:53.980, category:'alert' },
+  { pattern:/\bchah.?bahar\b/i,    name:'Chabahar Port',           region:'IRAN',           lat:25.296, lng:60.643, category:'alert' },
+  { pattern:/\bdimona\b/i,         name:'Dimona Nuclear Center',   region:'ISRAEL (Negev)', lat:31.003, lng:35.145, category:'offense' },
+  { pattern:/\bhaifa\b/i,          name:'Haifa Naval Base',        region:'ISRAEL',         lat:32.819, lng:34.986, category:'offense' },
+  { pattern:/\btyndall|al.?udeid|ramstein\b/i, /* already tracked */ },
+];
+
+function analyzeIntel(newsItems) {
+  if (!newsItems || newsItems.length === 0) return;
+
+  let changesMade = 0;
+
+  newsItems.forEach(news => {
+    const text = ((news.headline || '') + ' ' + (news.body || '')).toLowerCase();
+
+    // ── 1. Check existing bases for mentions ──
+    baseRegistry.forEach(base => {
+      const mentioned = base.aliases.some(alias => text.includes(alias.toLowerCase()));
+      if (!mentioned) return;
+
+      // Avoid duplicate updates
+      const updateKey = (news.headline || '').substring(0, 60);
+      if (base.newsUpdates.includes(updateKey)) return;
+
+      // Add the headline as an update
+      base.newsUpdates.push(updateKey);
+      if (base.newsUpdates.length > 5) base.newsUpdates.shift(); // keep last 5
+
+      // Append source to sources list
+      if (news.source && !base.sources.includes(news.source.toUpperCase())) {
+        base.sources += ' · ' + news.source.toUpperCase();
+      }
+
+      // ── Status escalation check ──
+      const currentSeverity = STATUS_SEVERITY.indexOf(base.status);
+
+      if (ESCALATION_KEYWORDS.hit.test(text) && currentSeverity > 0) {
+        // Escalate to 'hit' for attacked/alert bases, 'struck' for Iranian targets
+        if (base.category === 'iranian') {
+          base.status = 'struck';
+        } else if (base.category !== 'naval' && base.category !== 'offense') {
+          base.status = 'hit';
+          if (base.category === 'alert') base.category = 'attacked';
+        }
+        changesMade++;
+      } else if (ESCALATION_KEYWORDS.targeted.test(text) && currentSeverity > 2) {
+        if (base.category === 'alert') {
+          base.status = 'targeted';
+          base.category = 'attacked';
+        }
+        changesMade++;
+      }
+
+      // Append news context to body
+      if (news.headline) {
+        base.body += `<br><br><span style="color:var(--green)">📡 LIVE:</span> ${escapeHtml(news.headline)}`;
+      }
+
+      changesMade++;
+    });
+
+    // ── 2. Check for new locations not in registry ──
+    NEW_LOCATION_HINTS.forEach(hint => {
+      if (!hint.pattern || !hint.name) return;
+      if (!hint.pattern.test(text)) return;
+      // Don't add if already exists
+      if (baseRegistry.find(b => b.name === hint.name)) return;
+
+      const newBase = {
+        id: hint.name.toLowerCase().replace(/[^a-z0-9]/g,'_'),
+        name: hint.name,
+        region: hint.region,
+        lat: hint.lat, lng: hint.lng,
+        category: hint.category === 'iranian' ? 'iranian' : 'new_intel',
+        status: ESCALATION_KEYWORDS.hit.test(text) ? (hint.category === 'iranian' ? 'struck' : 'hit') : 'unconfirmed',
+        zoom: 9,
+        iconType: hint.category === 'iranian' ? 'explosion' : undefined,
+        iconLabel: hint.category === 'iranian' ? hint.name.split(' ')[0].toUpperCase() : undefined,
+        detail: 'Detected via live intel feed',
+        body: escapeHtml(news.headline || 'Mentioned in live news feed') + '<br><em style="color:#4a6a5a">Source: ' + escapeHtml(news.source || 'OSINT') + '</em>',
+        sources: (news.source || 'LIVE FEED').toUpperCase(),
+        aliases: [hint.name.toLowerCase()],
+        newsUpdates: [(news.headline || '').substring(0, 60)],
+      };
+
+      baseRegistry.push(newBase);
+      changesMade++;
+    });
+  });
+
+  // ── 3. Re-render everything if changes were made ──
+  if (changesMade > 0) {
+    renderMapMarkers();
+    renderSidebar();
+    updateHeaderStats();
+
+    // Update last-update timestamp
+    const now = new Date();
+    const ts = String(now.getUTCHours()).padStart(2,'0') + ':' +
+               String(now.getUTCMinutes()).padStart(2,'0');
+    document.getElementById('lastUpdate').textContent = 'MAP UPDATED ' + ts + ' UTC';
+    document.getElementById('lastUpdate').style.color = 'var(--green)';
+    setTimeout(() => {
+      document.getElementById('lastUpdate').style.color = '#2a4a3a';
+    }, 5000);
+  }
+
+  return changesMade;
+}
+
+// ══════════════════════════════════════════════════════════════
+// LIVE INTEL FEED — Multi-Source Free News APIs + RSS Fallback
+// ══════════════════════════════════════════════════════════════
+const SEARCH_TERMS = [
+  'Iran military', 'Iran Israel strikes', 'Iran nuclear',
+  'Middle East conflict', 'Iran US war', 'Operation Epic Fury',
+  'IRGC missile', 'Strait of Hormuz', 'Iran airstrikes'
+];
+const RSS_FEEDS = [
+  { name: 'AL JAZEERA',  url: 'https://www.aljazeera.com/xml/rss/all.xml' },
+  { name: 'BBC NEWS',    url: 'https://feeds.bbci.co.uk/news/world/middle_east/rss.xml' },
+  { name: 'NPR',         url: 'https://feeds.npr.org/1004/rss.xml' },
+  { name: 'REUTERS',     url: 'https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best' },
+  { name: 'CBS NEWS',    url: 'https://www.cbsnews.com/latest/rss/world' },
+];
+const CORS_PROXIES = [
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
+let autoRefreshInterval = null;
+let intelItems = [];
+let currentProxyIndex = 0;
+let settingsOpen = false;
+
+// Key management
+function getKey(p) { try { return localStorage.getItem('epic_fury_'+p+'_key')||''; } catch(e) { return ''; } }
+function setKey(p,k) { try { localStorage.setItem('epic_fury_'+p+'_key',k.trim()); } catch(e) {} }
+
+function toggleIntel() { document.getElementById('intelPanel').classList.toggle('open'); }
+function toggleSettings() {
+  settingsOpen = !settingsOpen;
+  const el = document.getElementById('settingsPanel');
+  el.style.display = settingsOpen ? 'block' : 'none';
+  if (settingsOpen) {
+    document.getElementById('keyGnews').value = getKey('gnews');
+    document.getElementById('keyNewsdata').value = getKey('newsdata');
+    document.getElementById('keyCurrents').value = getKey('currents');
+  }
+}
+function saveKeys() {
+  setKey('gnews', document.getElementById('keyGnews').value);
+  setKey('newsdata', document.getElementById('keyNewsdata').value);
+  setKey('currents', document.getElementById('keyCurrents').value);
+  toggleSettings();
+  const s = document.getElementById('intelStatus');
+  s.textContent = 'KEYS SAVED'; s.style.color = 'var(--green)';
+  setTimeout(() => { s.textContent = 'READY'; s.style.color = '#3a5a4a'; }, 2000);
+}
+function toggleAutoRefresh() {
+  document.getElementById('autoRefresh').checked ? startAutoRefresh() : stopAutoRefresh();
+}
+function startAutoRefresh() { stopAutoRefresh(); autoRefreshInterval = setInterval(fetchIntel, 5*60*1000); }
+function stopAutoRefresh() { if (autoRefreshInterval) { clearInterval(autoRefreshInterval); autoRefreshInterval = null; } }
+startAutoRefresh();
+
+// ══════════════════════════════════════════════════════════════
+// MASTER FETCH — cascade sources, then analyze + update map
+// ══════════════════════════════════════════════════════════════
+async function fetchIntel() {
+  const btn  = document.getElementById('refreshBtn');
+  const stat = document.getElementById('intelStatus');
+
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.textContent = '⟳ SEARCHING...';
+  stat.textContent = 'QUERYING SOURCES...';
+  stat.style.color = 'var(--amber)';
+
+  let items = [];
+  let usedSource = '';
+
+  // 1. GNews
+  const gnewsKey = getKey('gnews');
+  if (gnewsKey && items.length === 0) {
+    stat.textContent = 'SOURCE: GNEWS API...';
+    try { items = await fetchGNews(gnewsKey); usedSource = 'GNEWS'; } catch(e) { console.warn('GNews failed:', e.message); }
+  }
+  // 2. NewsData
+  const newsdataKey = getKey('newsdata');
+  if (newsdataKey && items.length === 0) {
+    stat.textContent = 'SOURCE: NEWSDATA.IO...';
+    try { items = await fetchNewsData(newsdataKey); usedSource = 'NEWSDATA'; } catch(e) { console.warn('NewsData failed:', e.message); }
+  }
+  // 3. Currents
+  const currentsKey = getKey('currents');
+  if (currentsKey && items.length === 0) {
+    stat.textContent = 'SOURCE: CURRENTS API...';
+    try { items = await fetchCurrents(currentsKey); usedSource = 'CURRENTS'; } catch(e) { console.warn('Currents failed:', e.message); }
+  }
+  // 4. RSS fallback
+  if (items.length === 0) {
+    stat.textContent = 'SOURCE: RSS FEEDS...';
+    try { items = await fetchAllRSS(); usedSource = 'RSS'; } catch(e) { console.warn('RSS failed:', e.message); }
+  }
+
+  if (items.length > 0) {
+    items.sort((a,b) => {
+      if (a.breaking && !b.breaking) return -1;
+      if (!a.breaking && b.breaking) return 1;
+      return (b._ts || 0) - (a._ts || 0);
+    });
+    items = items.slice(0, 15);
+
+    // ═══ THE KEY STEP: analyze intel and update the data model ═══
+    stat.textContent = 'ANALYZING INTEL...';
+    const changes = analyzeIntel(items);
+
+    renderIntelItems(items, changes);
+    updateTicker(items);
+
+    const now = new Date();
+    const ts = String(now.getUTCHours()).padStart(2,'0') + ':' + String(now.getUTCMinutes()).padStart(2,'0');
+    stat.textContent = `${usedSource} · ${items.length} ITEMS · ${changes} UPDATES · ${ts} UTC`;
+    stat.style.color = 'var(--green)';
+  } else {
+    document.getElementById('intelFeed').innerHTML = `
+      <div class="intel-error">
+        ⚠ NO SIGNAL<br><br>
+        <span style="color:#5a7a6a;font-size:10px;">
+          All news sources returned empty results.<br><br>
+          Click ⚙ to add a free API key for better results:<br>
+          • <a href="https://gnews.io" target="_blank" style="color:var(--green)">gnews.io</a> — 100 free req/day<br>
+          • <a href="https://newsdata.io" target="_blank" style="color:var(--green)">newsdata.io</a> — 200 free req/day<br>
+          • <a href="https://currentsapi.services" target="_blank" style="color:var(--green)">currentsapi.services</a> — 600 free req/day<br><br>
+          RSS fallback will retry on next refresh.
+        </span>
+      </div>`;
+    stat.textContent = 'NO DATA'; stat.style.color = 'var(--red)';
+  }
+
+  btn.disabled = false;
+  btn.classList.remove('loading');
+  btn.textContent = '↻ FETCH LATEST';
+}
+
+// ══════════════════════════════════════════════════════════════
+// SOURCE 1: GNews.io
+// ══════════════════════════════════════════════════════════════
+async function fetchGNews(apiKey) {
+  const queries = ['Iran military strikes','Iran Israel conflict','Middle East war'];
+  const allItems = [];
+  for (const q of queries) {
+    const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&lang=en&max=10&apikey=${apiKey}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`GNews ${resp.status}`);
+    const data = await resp.json();
+    if (data.articles) {
+      for (const a of data.articles) {
+        allItems.push({
+          headline: a.title||'', body: a.description||a.content||'',
+          source: (a.source?.name||'GNEWS').toUpperCase(), url: a.url||'',
+          time: formatTime(a.publishedAt), breaking: isBreaking(a.title),
+          _ts: new Date(a.publishedAt).getTime()||0, _id: a.url
+        });
+      }
+    }
+  }
+  return dedup(allItems);
+}
+
+// ══════════════════════════════════════════════════════════════
+// SOURCE 2: NewsData.io
+// ══════════════════════════════════════════════════════════════
+async function fetchNewsData(apiKey) {
+  const url = `https://newsdata.io/api/1/latest?apikey=${apiKey}&q=Iran+military+OR+Iran+Israel+OR+Middle+East+conflict&language=en&category=politics,world`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`NewsData ${resp.status}`);
+  const data = await resp.json();
+  if (!data.results) return [];
+  return dedup(data.results.map(a => ({
+    headline: a.title||'', body: a.description||a.content||'',
+    source: (a.source_name||a.source_id||'NEWSDATA').toUpperCase(), url: a.link||'',
+    time: formatTime(a.pubDate), breaking: isBreaking(a.title),
+    _ts: new Date(a.pubDate).getTime()||0, _id: a.link
+  })));
+}
+
+// ══════════════════════════════════════════════════════════════
+// SOURCE 3: Currents API
+// ══════════════════════════════════════════════════════════════
+async function fetchCurrents(apiKey) {
+  const url = `https://api.currentsapi.services/v1/search?keywords=Iran+military+Israel+Middle+East&language=en&apiKey=${apiKey}`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`Currents ${resp.status}`);
+  const data = await resp.json();
+  if (!data.news) return [];
+  return dedup(data.news.map(a => ({
+    headline: a.title||'', body: a.description||'',
+    source: (a.author||'CURRENTS').toUpperCase(), url: a.url||'',
+    time: formatTime(a.published), breaking: isBreaking(a.title),
+    _ts: new Date(a.published).getTime()||0, _id: a.url
+  })));
+}
+
+// ══════════════════════════════════════════════════════════════
+// SOURCE 4: RSS Feeds (zero-config fallback)
+// ══════════════════════════════════════════════════════════════
+async function fetchAllRSS() {
+  const allItems = [];
+  const results = await Promise.allSettled(RSS_FEEDS.map(f => fetchSingleRSS(f).catch(()=>[])));
+  for (const r of results) { if (r.status==='fulfilled' && r.value) allItems.push(...r.value); }
+  const keywords = /iran|israel|tehran|irgc|hezbollah|houthi|middle.?east|gulf|strait.?of.?hormuz|nuclear|missile|strike|military|pentagon|idf|war|conflict|bomb|attack|drone/i;
+  const filtered = allItems.filter(i => keywords.test(i.headline) || keywords.test(i.body));
+  return dedup(filtered.length > 0 ? filtered : allItems.slice(0, 10));
+}
+async function fetchSingleRSS(feed) {
+  let xml = null;
+  for (let i = 0; i < CORS_PROXIES.length; i++) {
+    const idx = (currentProxyIndex + i) % CORS_PROXIES.length;
+    try {
+      const resp = await fetch(CORS_PROXIES[idx](feed.url), { signal: AbortSignal.timeout(8000) });
+      if (resp.ok) { xml = await resp.text(); currentProxyIndex = idx; break; }
+    } catch(e) { continue; }
+  }
+  if (!xml) return [];
+  return parseRSS(xml, feed.name);
+}
+function parseRSS(xml, sourceName) {
+  const items = [];
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'text/xml');
+    doc.querySelectorAll('item, entry').forEach(entry => {
+      const title = entry.querySelector('title')?.textContent?.trim()||'';
+      const desc = entry.querySelector('description, summary, content')?.textContent?.trim()||'';
+      const link = entry.querySelector('link')?.textContent?.trim() || entry.querySelector('link')?.getAttribute('href')||'';
+      const pubDate = entry.querySelector('pubDate, published, updated')?.textContent?.trim()||'';
+      const cleanDesc = desc.replace(/<[^>]*>/g,'').replace(/&[a-z]+;/gi,' ').trim();
+      if (title) {
+        items.push({
+          headline: title, body: cleanDesc.substring(0,300), source: sourceName,
+          url: link, time: formatTime(pubDate), breaking: isBreaking(title),
+          _ts: new Date(pubDate).getTime()||0, _id: link||title
+        });
+      }
+    });
+  } catch(e) {}
+  return items;
+}
+
+// ══════════════════════════════════════════════════════════════
+// UTILITIES
+// ══════════════════════════════════════════════════════════════
+function isBreaking(title) {
+  if (!title) return false;
+  return /breaking|just.?in|urgent|alert|confirmed|killed|struck|attacked|launches|declares|emergency/i.test(title);
+}
+function formatTime(dateStr) {
+  if (!dateStr) return 'RECENT';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'RECENT';
+    const diffMin = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (diffMin < 1) return 'JUST NOW';
+    if (diffMin < 60) return `${diffMin}m AGO`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `${diffH}h AGO`;
+    const diffD = Math.floor(diffH / 24);
+    if (diffD < 7) return `${diffD}d AGO`;
+    return d.toISOString().slice(0,10);
+  } catch(e) { return 'RECENT'; }
+}
+function dedup(items) {
+  const seen = new Set();
+  return items.filter(i => { const k = i._id||i.headline; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDERING — Intel Feed Panel
+// ══════════════════════════════════════════════════════════════
+function renderIntelItems(items, mapChanges) {
+  const feed = document.getElementById('intelFeed');
+  intelItems = items;
+
+  // Prepend a map-update summary if changes were made
+  let summaryHtml = '';
+  if (mapChanges > 0) {
+    summaryHtml = `<div style="padding:10px 16px;background:rgba(57,255,20,0.05);border-bottom:1px solid rgba(57,255,20,0.15);font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--green);letter-spacing:1.5px;text-align:center;">
+      ✅ ${mapChanges} MAP/SIDEBAR UPDATE${mapChanges!==1?'S':''} APPLIED FROM THIS FETCH
+    </div>`;
+  }
+
+  feed.innerHTML = summaryHtml + items.map((item, i) => `
+    <div class="intel-item ${item.breaking ? 'breaking' : ''}" style="animation-delay:${i * 0.05}s">
+      <div class="intel-item-header">
+        <div class="intel-item-source">${item.breaking ? '🔴 BREAKING · ' : ''}${escapeHtml(item.source || 'OSINT')}</div>
+        <div class="intel-item-time">${escapeHtml(item.time || 'RECENT')}</div>
+      </div>
+      <div class="intel-item-headline">${escapeHtml(item.headline)}</div>
+      <div class="intel-item-body">${escapeHtml(item.body)}</div>
+      ${item.url ? `<a class="intel-item-url" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.url)}</a>` : ''}
+    </div>
+  `).join('');
+}
+
+function updateTicker(items) {
+  const ticker = document.getElementById('tickerWrap');
+  const headlineItems = items.filter(i => i.headline).slice(0, 8);
+  if (headlineItems.length > 0) {
+    ticker.innerHTML = headlineItems.map(i =>
+      `● ${(i.headline||'').toUpperCase()} — ${(i.source||'OSINT').toUpperCase()}`
+    ).join(' &nbsp;·&nbsp; ') + ' &nbsp;·&nbsp; ';
+    ticker.style.animationDuration = Math.max(30, headlineItems.length * 8) + 's';
+  }
+}
+</script>
+</script>
+</body>
+</html>
